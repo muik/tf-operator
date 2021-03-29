@@ -2,28 +2,52 @@ apiVersion: "kubeflow.org/v1"
 kind: "TFJob"
 metadata:
   name: "mnist"
-  namespace: kubeflow 
+  namespace: default-profile
 spec:
-  cleanPodPolicy: None 
+  cleanPodPolicy: All
   tfReplicaSpecs:
     Worker:
       replicas: 1 
       restartPolicy: Never
       template:
+        metadata:
+          annotations:
+            sidecar.istio.io/inject: "false"
         spec:
+          serviceAccountName: default-editor
+          nodeSelector:
+            #cloud.google.com/gke-accelerator: nvidia-tesla-t4
+            #cloud.google.com/gke-preemptible: "true"
+            pool-name: preemptible-small-gpu-pool
+          tolerations:
+            - key: preemptible
+              value: 'true'
+              effect: NoSchedule
           containers:
             - name: tensorflow
-              image: gcr.io/kubeflow-ci/tf-mnist-with-summaries:1.0
-              command:
-                - "python"
-                - "/var/tf_mnist/mnist_with_summaries.py"
-                - "--log_dir=/train/logs"
-                - "--learning_rate=0.01"
-                - "--batch_size=150"
-              volumeMounts:
-                - mountPath: "/train"
-                  name: "training"
-          volumes:
-            - name: "training"
-              persistentVolumeClaim:
-                claimName: "tfevent-volume"  
+              #image: gcr.io/kubeflow-ci/tf-mnist-with-summaries:1.0
+              #image: google/cloud-sdk:slim
+              image: tensorflow/tensorflow:2.4.1-gpu
+              resources:
+                limits:
+                  nvidia.com/gpu: "1" # requesting 1 GPU
+              #command: ["echo"]
+              args:
+                - "nvidia-smi"
+                #- "gsutil"
+                #- "ls"
+                #- "python"
+                #- "/var/tf_mnist/mnist_with_summaries.py"
+                #- "--log_dir=/train/logs"
+                #- "--learning_rate=0.01"
+                #- "--batch_size=150"
+          #    volumeMounts:
+          #      - mountPath: "/train"
+          #        name: "training"
+          #    #env:
+          #    #  - name: CLOUDSDK_CORE_PROJECT
+          #    #    value: "towneers"
+          #volumes:
+          #  - name: "training"
+          #    persistentVolumeClaim:
+          #      claimName: "tfevent-volume"
